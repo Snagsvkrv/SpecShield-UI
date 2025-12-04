@@ -1,111 +1,3 @@
-// import { useCallback } from "react";
-
-// type GenResponse = {
-//   status?: string;
-//   executionId?: string;
-//   message?: string;
-//   [k: string]: any;
-// };
-
-// type ReportResponse = {
-//   executionDetails?: any[];
-//   overview?: {
-//     errors?: number;
-//     executionTime?: string;
-//     pending?: number;
-//     successful?: number;
-//     total?: number;
-//     warnings?: number;
-//     [k: string]: any;
-//   };
-//   reportTimestamp?: string;
-//   [k: string]: any;
-// };
-
-// function sleep(ms: number) {
-//   return new Promise((resolve) => setTimeout(resolve, ms));
-// }
-
-// export function useSpecShieldAPI() {
-//   const callAPI = useCallback(
-//     async (selectedTenant: string, baseUrl: string, opts?: { pollIntervalMs?: number; maxAttempts?: number }) => {
-//       const pollIntervalMs = opts?.pollIntervalMs ?? 500;
-//       const maxAttempts = opts?.maxAttempts ?? 240; // default ~2 minutes
-
-//       // POST to start execution
-//       const genResp = await fetch("http://localhost:9000/specshield/generate", {
-//         method: "POST",
-//         headers: {
-//           "Content-Type": "application/json",
-//           "x-tenant-id": selectedTenant,
-//           "x-client-privileges": '{"root":["root"]}',
-//           "x-user-name": "test",
-//         },
-//         body: JSON.stringify({ baseUrl }),
-//       });
-
-//       if (!genResp.ok) {
-//         const text = await genResp.text().catch(() => "");
-//         throw new Error(`Generate API failed: ${genResp.status} ${text}`);
-//       }
-
-//       const genJson: GenResponse = await genResp.json();
-
-//       // If we received an executionId, poll the report endpoint until pending === 0
-//       if (genJson.executionId) {
-//         const execId = genJson.executionId;
-//         const reportUrl = `http://localhost:9000/specshield/report/${execId}?page=0&size=10`;
-
-//         let attempts = 0;
-//         while (true) {
-//           attempts += 1;
-
-//           const reportResp = await fetch(reportUrl, {
-//             method: "GET",
-//             headers: {
-//               "Content-Type": "application/json",
-//               "x-tenant-id": selectedTenant,
-//             },
-//           });
-
-//           if (!reportResp.ok) {
-//             const text = await reportResp.text().catch(() => "");
-//             throw new Error(`Report API failed: ${reportResp.status} ${text}`);
-//           }
-
-//           const reportJson: ReportResponse = await reportResp.json();
-
-//           const pending = reportJson?.overview?.pending;
-//           // If pending is defined and zero => finished
-//           if (typeof pending === "number" && pending <= 0) {
-//             return { generate: genJson, report: reportJson };
-//           }
-
-//           // If no overview/pending present, return the current report (caller can decide)
-//           if (typeof pending !== "number") {
-//             return { generate: genJson, report: reportJson };
-//           }
-
-//           // If exceeded max attempts, return the latest report (or throw if you prefer)
-//           if (attempts >= maxAttempts) {
-//             // return last-known report so the caller can show partial results/fallback
-//             return { generate: genJson, report: reportJson };
-//           }
-
-//           // wait before next attempt
-//           await sleep(pollIntervalMs);
-//         }
-//       }
-
-//       // no executionId -> return generate response only
-//       return { generate: genJson, report: null };
-//     },
-//     []
-//   );
-
-//   return { callAPI };
-// }
-
 import { useCallback } from "react";
 
 type GenResponse = {
@@ -153,10 +45,6 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/**
- * Local shapes matching Dashboard's expected ProcessingResult / ExecutionDetail.
- * Kept local to avoid coupling with component files.
- */
 type ExecutionDetailMapped = {
   id: string;
   timestamp: string;
@@ -188,10 +76,15 @@ export function useSpecShieldAPI() {
     async (
       selectedTenant: string,
       baseUrl: string,
-      opts?: { pollIntervalMs?: number; maxAttempts?: number }
+      opts?: {
+        pollIntervalMs?: number;
+        maxAttempts?: number;
+        onProgress?: (pending: number, total: number) => void;
+      }
     ) => {
       const pollIntervalMs = opts?.pollIntervalMs ?? 500;
       const maxAttempts = opts?.maxAttempts ?? 240; // ~2 minutes by default
+      const onProgress = opts?.onProgress;
 
       // POST to start execution
       const genResp = await fetch("http://localhost:9000/specshield/generate", {
@@ -221,7 +114,7 @@ export function useSpecShieldAPI() {
           id: d.id ?? "unknown",
           timestamp: d.timestamp ?? "",
           scenario: d.scenario ?? "",
-          expectedResult: d.expectedResult ?? "", // fallback if server doesn't provide
+          expectedResult: d.expectedResult ?? "",
           result: d.result ?? "",
           resultDetails: d.resultDetails ?? "",
           contractPath: d.contractPath ?? "",
@@ -271,11 +164,22 @@ export function useSpecShieldAPI() {
           const reportJson: RawReportResponse = await reportResp.json();
           lastReportJson = reportJson;
 
-          const pending = reportJson?.overview?.pending;
+          const pending = typeof reportJson?.overview?.pending === "number" ? reportJson.overview!.pending! : -1;
+          const total = typeof reportJson?.overview?.total === "number" ? reportJson.overview!.total! : 0;
+
+          // Emit progress callback
+          try {
+            if (typeof pending === "number" && typeof total === "number") {
+              onProgress?.(pending, total);
+            } else if (typeof pending === "number") {
+              onProgress?.(pending, total);
+            }
+          } catch {
+            // ignore progress callback errors
+          }
 
           // If pending is defined and zero => finished
           if (typeof pending === "number" && pending <= 0) {
-            // transform and return
             const transformed = transformReport(reportJson);
             return { generate: genJson, report: transformed };
           }
