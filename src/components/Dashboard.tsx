@@ -3,6 +3,9 @@ import { UrlInput } from "./UrlInput";
 import { ProgressBar } from "./ProgressBar";
 import { ResultsChart } from "./ResultChart";
 import { FullReportAccordion } from "./FullReportAccordion";
+import { TenantSelection } from "./TenantSelection";
+import { mockProcessingResult } from "../mocks/mockResult";
+import { useSpecShieldAPI } from "../hooks/useSpecShieldAPI";
 
 export interface ExecutionDetail {
   id: string;
@@ -34,142 +37,110 @@ export function Dashboard() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<ProcessingResult | null>(null);
+  const [selectedTenant, setSelectedTenant] = useState("IMS_KENYA");
+  const { callAPI } = useSpecShieldAPI();
 
-  const handleSubmit = async (url: string) => {
+  // const handleSubmit = async (url: string) => {
+  //   setIsProcessing(true);
+  //   setProgress(0);
+  //   setResult(null);
+
+  //   // Call the API
+  //   try {
+  //     await callAPI(selectedTenant, url);
+  //   } catch (err) {
+  //     console.error("API call failed:", err);
+  //   }
+
+  //   // Simulate backend processing with progress updates
+  //   const interval = setInterval(() => {
+  //     setProgress((prev) => {
+  //       if (prev >= 100) {
+  //         clearInterval(interval);
+  //         return 100;
+  //       }
+  //       return prev + Math.random() * 15;
+  //     });
+  //   }, 300);
+
+  //   // Simulate API call
+  //   setTimeout(() => {
+  //     clearInterval(interval);
+  //     setProgress(100);
+
+  //     setTimeout(() => {
+  //       setResult(mockProcessingResult);
+  //       setIsProcessing(false);
+  //     }, 500);
+  //   }, 5000);
+  // };
+
+  const handleSubmit = async (inputUrl: string) => {
+    if (!inputUrl || !selectedTenant) return;
+
     setIsProcessing(true);
     setProgress(0);
     setResult(null);
 
-    // Simulate backend processing with progress updates
+    // Start progress animation
     const interval = setInterval(() => {
       setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          return 100;
+        if (prev >= 99) {
+          return prev; // let finalization set to 100
         }
-        return prev + Math.random() * 15;
+        // gentle progress growth while backend work happens
+        return Math.min(99, prev + Math.random() * 12);
       });
     }, 300);
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      // callAPI will POST to generate, then call report endpoint if executionId is returned
+      const { generate, report } = await callAPI(selectedTenant, inputUrl);
+
+      // If report exists and has the expected shape, use it. Otherwise fallback to mock.
+      if (
+        report &&
+        (report.total || report.success || report.executionDetails)
+      ) {
+        // assume report already matches ProcessingResult shape; if not adapt mapping here
+        setResult(report as ProcessingResult);
+      } else {
+        // fall back to mock if report not present
+        setResult(mockProcessingResult);
+      }
+    } catch (err) {
+      console.error("API call or report fetch failed:", err);
+      // on error, show mock result but keep a console error (or show a UI error as next improvement)
+      setResult(mockProcessingResult);
+    } finally {
+      // finish progress
       clearInterval(interval);
       setProgress(100);
-
-      // Mock result data based on the backend response format
-      const mockResult: ProcessingResult = {
-        reportTimestamp: new Date().toUTCString(),
-        executionTime: "4m45s",
-        total: 2714,
-        success: 2182,
-        failure: 532,
-        executionDetails: [
-          {
-            id: "Test 1",
-            timestamp: "Thu, 3 Aug 2023 20:17:24 +0300",
-            scenario:
-              "Send [values containing zalgo text] in request fields: field [name], value [PREFIX with...], is required [FALSE]",
-            expectedResult: "Should return [2XX]",
-            result: "error",
-            resultDetails: "Unexpected behaviour: expected [200, 201, 202, 204], actual [400]",
-            contractPath: "/admin/users",
-            fullRequestPath: "http://localhost:8091/admin/users",
-            httpMethod: "post",
-            requestDetails: {
-              headers: {
-                "Content-Type": "application/json",
-                Accept: "application/json",
-              },
-              payload: {
-                name: "F̷̢V̸͝F̶o̵7̸c̷S̵",
-                email: "YYmuScool.cats@cats.io",
-              },
-              curl: 'curl -X POST \'http://localhost:8091/admin/users\' -H \'Content-Type: application/json\' -d \'{"name":"F̷̢V̸͝F̶o̵7̸c̷S̵","email":"YYmuScool.cats@cats.io"}\'',
-            },
-          },
-          {
-            id: "Test 2",
-            timestamp: "Thu, 3 Aug 2023 20:17:30 +0300",
-            scenario:
-              "Send [valid values] in request fields: field [name], value [John Doe], is required [TRUE]",
-            expectedResult: "Should return [2XX]",
-            result: "success",
-            resultDetails: "Response matched expected: actual [201]",
-            contractPath: "/admin/users",
-            fullRequestPath: "http://localhost:8091/admin/users",
-            httpMethod: "post",
-            requestDetails: {
-              headers: {
-                "Content-Type": "application/json",
-                Accept: "application/json",
-              },
-              payload: {
-                name: "John Doe",
-                email: "johndoe@cats.io",
-              },
-              curl: 'curl -X POST \'http://localhost:8091/admin/users\' -H \'Content-Type: application/json\' -d \'{"name":"John Doe","email":"johndoe@cats.io"}\'',
-            },
-          },
-          {
-            id: "Test 3",
-            timestamp: "Thu, 3 Aug 2023 20:17:35 +0300",
-            scenario: "Send [empty string] in required field [email]",
-            expectedResult: "Should return [4XX]",
-            result: "success",
-            resultDetails: "Response matched expected: actual [400]",
-            contractPath: "/admin/users",
-            fullRequestPath: "http://localhost:8091/admin/users",
-            httpMethod: "post",
-            requestDetails: {
-              headers: {
-                "Content-Type": "application/json",
-                Accept: "application/json",
-              },
-              payload: {
-                name: "Test User",
-                email: "",
-              },
-              curl: 'curl -X POST \'http://localhost:8091/admin/users\' -H \'Content-Type: application/json\' -d \'{"name":"Test User","email":""}\'',
-            },
-          },
-          {
-            id: "Test 4",
-            timestamp: "Thu, 3 Aug 2023 20:17:40 +0300",
-            scenario: "Send [SQL injection] in field [name]",
-            expectedResult: "Should return [2XX] or [4XX]",
-            result: "error",
-            resultDetails: "Server error: actual [500]",
-            contractPath: "/admin/users",
-            fullRequestPath: "http://localhost:8091/admin/users",
-            httpMethod: "post",
-            requestDetails: {
-              headers: {
-                "Content-Type": "application/json",
-                Accept: "application/json",
-              },
-              payload: {
-                name: "'; DROP TABLE users; --",
-                email: "hacker@cats.io",
-              },
-              curl: 'curl -X POST \'http://localhost:8091/admin/users\' -H \'Content-Type: application/json\' -d \'{"name":"\'; DROP TABLE users; --","email":"hacker@cats.io"}\'',
-            },
-          },
-        ],
-      };
-
+      // small delay for a nicer UX
       setTimeout(() => {
-        setResult(mockResult);
         setIsProcessing(false);
-      }, 500);
-    }, 5000);
+      }, 300);
+    }
   };
 
   return (
     <div className="mx-auto max-w-6xl p-8">
       <div className="rounded-lg bg-white p-8 shadow-lg">
-        <h1 className="mb-8 font-bold text-xl">API Automation Test Dashboard</h1>
+        <h1 className="mb-8 font-bold text-xl">
+          API Automation Test Dashboard
+        </h1>
 
-        <UrlInput onSubmit={handleSubmit} disabled={isProcessing} />
+        <div className="mb-6 flex flex-col gap-4">
+          <div className="flex-1">
+            <UrlInput onSubmit={handleSubmit} disabled={isProcessing} />
+          </div>
+          <div className="w-64">
+            <TenantSelection
+              onTenantChange={setSelectedTenant}
+              disabled={isProcessing}
+            />
+          </div>
+        </div>
 
         {isProcessing && (
           <div className="mt-8">

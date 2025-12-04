@@ -6,7 +6,9 @@ interface FullReportAccordionProps {
   executionDetails: ExecutionDetail[];
 }
 
-export function FullReportAccordion({ executionDetails }: FullReportAccordionProps) {
+export function FullReportAccordion({
+  executionDetails,
+}: FullReportAccordionProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -17,7 +19,9 @@ export function FullReportAccordion({ executionDetails }: FullReportAccordionPro
       >
         <span className="flex items-center gap-2">
           <span>Full Report</span>
-          <span className="text-sm text-gray-500">({executionDetails.length} test cases)</span>
+          <span className="text-sm text-gray-500">
+            ({executionDetails.length} test cases)
+          </span>
         </span>
         {isOpen ? (
           <ChevronUp className="h-5 w-5 text-gray-600" />
@@ -33,7 +37,7 @@ export function FullReportAccordion({ executionDetails }: FullReportAccordionPro
               <tr className="border-b border-gray-200">
                 <th className="bg-gray-50 px-4 py-3 text-left">Test Case ID</th>
                 <th className="bg-gray-50 px-4 py-3 text-left">Description</th>
-                <th className="bg-gray-50 px-4 py-3 text-left">Expected Result</th>
+                {/* <th className="bg-gray-50 px-4 py-3 text-left">Expected Result</th> */}
                 <th className="bg-gray-50 px-4 py-3 text-left">Result</th>
                 <th className="bg-gray-50 px-4 py-3 text-left">Details</th>
               </tr>
@@ -53,9 +57,9 @@ export function FullReportAccordion({ executionDetails }: FullReportAccordionPro
                       {test.httpMethod.toUpperCase()} {test.contractPath}
                     </div>
                   </td>
-                  <td className="px-4 py-3">
+                  {/* <td className="px-4 py-3">
                     <div className="text-sm">{test.expectedResult}</div>
-                  </td>
+                  </td> */}
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       {test.result === "success" ? (
@@ -72,7 +76,9 @@ export function FullReportAccordion({ executionDetails }: FullReportAccordionPro
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="text-sm text-gray-700">{test.resultDetails}</div>
+                    <div className="text-sm text-gray-700">
+                      {test.resultDetails}
+                    </div>
                   </td>
                 </tr>
               ))}
