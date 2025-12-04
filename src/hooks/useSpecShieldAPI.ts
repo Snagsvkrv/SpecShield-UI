@@ -45,6 +45,9 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Local shapes matching Dashboard's expected ProcessingResult / ExecutionDetail.
+ */
 type ExecutionDetailMapped = {
   id: string;
   timestamp: string;
@@ -71,6 +74,37 @@ type ProcessingResultMapped = {
   executionDetails?: ExecutionDetailMapped[];
 };
 
+const transformReport = (raw: RawReportResponse): ProcessingResultMapped => {
+  const overview = raw.overview ?? {};
+  const executionDetailsRaw = raw.executionDetails ?? [];
+
+  const executionDetails: ExecutionDetailMapped[] = executionDetailsRaw.map((d) => ({
+    id: d.id ?? "unknown",
+    timestamp: d.timestamp ?? "",
+    scenario: d.scenario ?? "",
+    expectedResult: d.expectedResult ?? "",
+    result: d.result ?? "",
+    resultDetails: d.resultDetails ?? "",
+    contractPath: d.contractPath ?? "",
+    fullRequestPath: d.fullRequestPath ?? "",
+    httpMethod: d.httpMethod ?? "",
+    requestDetails: {
+      headers: d.requestDetails?.headers ?? {},
+      payload: d.requestDetails?.payload ?? {},
+      curl: d.requestDetails?.curl ?? "",
+    },
+  }));
+
+  return {
+    success: overview.successful ?? 0,
+    failure: overview.errors ?? 0,
+    total: overview.total ?? executionDetails.length,
+    reportTimestamp: raw.reportTimestamp ?? new Date().toUTCString(),
+    executionTime: overview.executionTime ?? undefined,
+    executionDetails,
+  };
+};
+
 export function useSpecShieldAPI() {
   const callAPI = useCallback(
     async (
@@ -83,7 +117,7 @@ export function useSpecShieldAPI() {
       }
     ) => {
       const pollIntervalMs = opts?.pollIntervalMs ?? 500;
-      const maxAttempts = opts?.maxAttempts ?? 240; // ~2 minutes by default
+      const maxAttempts = opts?.maxAttempts ?? 240;
       const onProgress = opts?.onProgress;
 
       // POST to start execution
@@ -104,38 +138,6 @@ export function useSpecShieldAPI() {
       }
 
       const genJson: GenResponse = await genResp.json();
-
-      // Helper to transform a raw report into ProcessingResultMapped
-      const transformReport = (raw: RawReportResponse): ProcessingResultMapped => {
-        const overview = raw.overview ?? {};
-        const executionDetailsRaw = raw.executionDetails ?? [];
-
-        const executionDetails: ExecutionDetailMapped[] = executionDetailsRaw.map((d) => ({
-          id: d.id ?? "unknown",
-          timestamp: d.timestamp ?? "",
-          scenario: d.scenario ?? "",
-          expectedResult: d.expectedResult ?? "",
-          result: d.result ?? "",
-          resultDetails: d.resultDetails ?? "",
-          contractPath: d.contractPath ?? "",
-          fullRequestPath: d.fullRequestPath ?? "",
-          httpMethod: d.httpMethod ?? "",
-          requestDetails: {
-            headers: d.requestDetails?.headers ?? {},
-            payload: d.requestDetails?.payload ?? {},
-            curl: d.requestDetails?.curl ?? "",
-          },
-        }));
-
-        return {
-          success: overview.successful ?? 0,
-          failure: overview.errors ?? 0,
-          total: overview.total ?? executionDetails.length,
-          reportTimestamp: raw.reportTimestamp ?? new Date().toUTCString(),
-          executionTime: overview.executionTime ?? undefined,
-          executionDetails,
-        };
-      };
 
       // If we received an executionId, poll the report endpoint until pending === 0
       if (genJson.executionId) {
@@ -164,14 +166,12 @@ export function useSpecShieldAPI() {
           const reportJson: RawReportResponse = await reportResp.json();
           lastReportJson = reportJson;
 
-          const pending = typeof reportJson?.overview?.pending === "number" ? reportJson.overview!.pending! : -1;
-          const total = typeof reportJson?.overview?.total === "number" ? reportJson.overview!.total! : 0;
+          const pending = reportJson?.overview?.pending;
+          const total = reportJson?.overview?.total ?? 0;
 
           // Emit progress callback
           try {
-            if (typeof pending === "number" && typeof total === "number") {
-              onProgress?.(pending, total);
-            } else if (typeof pending === "number") {
+            if (typeof pending === "number") {
               onProgress?.(pending, total);
             }
           } catch {
@@ -201,11 +201,35 @@ export function useSpecShieldAPI() {
         }
       }
 
-      // no executionId -> return generate response only
+      // no executionId -> return gen response only
       return { generate: genJson, report: null };
     },
     []
   );
 
-  return { callAPI };
+  const fetchReportPage = useCallback(
+    async (selectedTenant: string, execId: string, page = 0, size = 10) => {
+      const reportUrl = `http://localhost:9000/specshield/report/${execId}?page=${page}&size=${size}`;
+
+      const reportResp = await fetch(reportUrl, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "x-tenant-id": selectedTenant,
+        },
+      });
+
+      if (!reportResp.ok) {
+        const text = await reportResp.text().catch(() => "");
+        throw new Error(`Report page fetch failed: ${reportResp.status} ${text}`);
+      }
+
+      const reportJson: RawReportResponse = await reportResp.json();
+      const transformed = transformReport(reportJson);
+      return transformed;
+    },
+    []
+  );
+
+  return { callAPI, fetchReportPage };
 }

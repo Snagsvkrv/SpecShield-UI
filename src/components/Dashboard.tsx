@@ -38,7 +38,8 @@ export function Dashboard() {
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<ProcessingResult | null>(null);
   const [selectedTenant, setSelectedTenant] = useState("IMS_KENYA");
-  const { callAPI } = useSpecShieldAPI();
+  const { callAPI, fetchReportPage } = useSpecShieldAPI();
+  const [executionId, setExecutionId] = useState<string | null>(null);
 
   const handleSubmit = async (inputUrl: string) => {
     if (!inputUrl || !selectedTenant) return;
@@ -48,7 +49,7 @@ export function Dashboard() {
     setResult(null);
 
     try {
-      const { report } = await callAPI(selectedTenant, inputUrl, {
+      const { generate, report } = await callAPI(selectedTenant, inputUrl, {
         pollIntervalMs: 500,
         maxAttempts: 240,
         onProgress: (pending: number, total: number) => {
@@ -61,6 +62,8 @@ export function Dashboard() {
           setProgress(Math.min(99, Math.max(0, pct)));
         },
       });
+
+      setExecutionId(generate?.executionId ?? null);
 
       if (report) {
         setResult(report);
@@ -106,7 +109,14 @@ export function Dashboard() {
           <div className="mt-8 space-y-8">
             <ResultsChart data={result} />
             {result.executionDetails && (
-              <FullReportAccordion executionDetails={result.executionDetails} />
+              <FullReportAccordion
+                executionDetails={result.executionDetails}
+                total={result.total}
+                pageSize={10}
+                executionId={executionId}
+                tenant={selectedTenant}
+                fetchReportPage={fetchReportPage}
+              />
             )}
           </div>
         )}
