@@ -1,5 +1,12 @@
 // @ts-nocheck
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Legend,
+  Tooltip,
+} from "recharts";
 import { CheckCircle, XCircle, Database } from "lucide-react";
 import type { ProcessingResult } from "./Dashboard";
 
@@ -15,7 +22,7 @@ export function ResultsChart({ data }: ResultsChartProps) {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-center">Processing Results</h2>
+      <h2 className="text-center">Processed Results</h2>
 
       <div className="mb-6 grid grid-cols-3 gap-4">
         <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-4">
@@ -50,7 +57,9 @@ export function ResultsChart({ data }: ResultsChartProps) {
             cx="50%"
             cy="50%"
             labelLine={false}
-            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+            label={({ name, percent }) =>
+              `${name}: ${(percent * 100).toFixed(0)}%`
+            }
             outerRadius={100}
             fill="#8884d8"
             dataKey="value"

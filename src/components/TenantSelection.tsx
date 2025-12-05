@@ -8,9 +8,11 @@ interface TenantSelectionProps {
 
 const TENANTS = [
   { value: "IMS_KENYA", label: "IMS Kenya" },
-  { value: "IMS_UGANDA", label: "IMS Uganda" },
-  { value: "IMS_TANZANIA", label: "IMS Tanzania" },
-  { value: "IMS_ETHIOPIA", label: "IMS Ethiopia" },
+  { value: "GCC", label: "GCC" },
+  { value: "SYNCREON", label: "Syncreon" },
+  { value: "IHS_SA", label: "IHS SA" },
+  { value: "CFR", label: "CFR" },
+  { value: "SURGIPHARM", label: "SURGIPHARM" },
 ];
 
 export function TenantSelection({

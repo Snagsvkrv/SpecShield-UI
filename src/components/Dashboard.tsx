@@ -83,9 +83,13 @@ export function Dashboard() {
   return (
     <div className="mx-auto max-w-6xl p-8">
       <div className="rounded-lg bg-white p-8 shadow-lg">
-        <h1 className="mb-8 font-bold text-xl">
+        {/* <h1 className="mb-8 font-bold text-xl">
           API Automation Test Dashboard
-        </h1>
+        </h1> */}
+        <div className="mb-8 flex items-center gap-2">
+          <img src="/logo.png" alt="SpecShield logo" className="h-20 w-auto" />
+          <h1 className="font-bold text-xl">API Automation Test Dashboard</h1>
+        </div>
 
         <div className="mb-6 flex flex-col gap-4">
           <div className="flex-1">

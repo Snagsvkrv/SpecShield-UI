@@ -226,8 +226,15 @@
 // }
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronUp, CheckCircle, XCircle } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  CheckCircle,
+  XCircle,
+  Eye,
+} from "lucide-react";
 import type { ExecutionDetail } from "./Dashboard";
+import { TestCaseDrawer } from "./TestCaseDrawer";
 
 interface FullReportAccordionProps {
   executionDetails: ExecutionDetail[]; // initial page (page 0)
@@ -256,6 +263,10 @@ export function FullReportAccordion({
   const [currentRows, setCurrentRows] =
     useState<ExecutionDetail[]>(executionDetails);
   const [loadingPage, setLoadingPage] = useState(false);
+
+  const [selectedTestCase, setSelectedTestCase] = useState<any>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [loadingTestId, setLoadingTestId] = useState<string | null>(null);
 
   // ref to the table wrapper — we'll scroll this into view when page changes
   const tableRef = useRef<HTMLDivElement | null>(null);
@@ -367,6 +378,79 @@ export function FullReportAccordion({
     );
   };
 
+  const handleDetailsClick = async (testId: string) => {
+    setLoadingTestId(testId);
+
+    // If executionId or tenant not available, fallback to mock behavior
+    if (!executionId || !tenant) {
+      setTimeout(() => {
+        const fallback = {
+          id: testId,
+          contractPath: "",
+          expectedResult: {},
+          fullRequestPath: "",
+          httpMethod: "",
+          requestDetails: {
+            curl: "",
+            headers: {},
+            payload: null,
+          },
+          responseDetails: {},
+          result: "error",
+          resultDetails: "No executionId/tenant available to fetch details",
+          scenario: "",
+          testKey: testId,
+          timestamp: new Date().toISOString(),
+        };
+        setSelectedTestCase(fallback);
+        setLoadingTestId(null);
+        setIsDrawerOpen(true);
+      }, 300);
+      return;
+    }
+
+    try {
+      const url = `http://localhost:9000/specshield/report/${executionId}/testcase/${testId}`;
+      const resp = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "x-tenant-id": tenant,
+        },
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text().catch(() => "");
+        throw new Error(`Testcase fetch failed: ${resp.status} ${text}`);
+      }
+
+      const data = await resp.json();
+      // set the drawer payload to what the API returns
+      setSelectedTestCase(data);
+      setIsDrawerOpen(true);
+    } catch (err: any) {
+      console.error("Failed to fetch testcase details:", err);
+      // Fallback minimal object so drawer can still open and show the error
+      setSelectedTestCase({
+        id: testId,
+        contractPath: "",
+        expectedResult: {},
+        fullRequestPath: "",
+        httpMethod: "",
+        requestDetails: { curl: "", headers: {}, payload: null },
+        responseDetails: {},
+        result: "error",
+        resultDetails: err?.message ?? "Failed to fetch testcase details",
+        scenario: "",
+        testKey: testId,
+        timestamp: new Date().toISOString(),
+      });
+      setIsDrawerOpen(true);
+    } finally {
+      setLoadingTestId(null);
+    }
+  };
+
   return (
     <div className="overflow-hidden rounded-lg border border-gray-200">
       <button
@@ -400,6 +484,7 @@ export function FullReportAccordion({
                   </th>
                   <th className="bg-gray-50 px-4 py-3 text-left">Result</th>
                   <th className="bg-gray-50 px-4 py-3 text-left">Details</th>
+                  <th className="text-left py-3 px-4 bg-gray-50">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -450,6 +535,16 @@ export function FullReportAccordion({
                           {test.resultDetails}
                         </div>
                       </td>
+                      <td className="py-3 px-4">
+                        <button
+                          onClick={() => handleDetailsClick(test.id)}
+                          disabled={loadingTestId === test.id}
+                          className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-sm"
+                        >
+                          <Eye className="w-4 h-4" />
+                          {loadingTestId === test.id ? "Loading..." : "Details"}
+                        </button>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -460,6 +555,11 @@ export function FullReportAccordion({
           {renderPagination()}
         </div>
       )}
+      <TestCaseDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        testCaseData={selectedTestCase}
+      />
     </div>
   );
 }

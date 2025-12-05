@@ -129,7 +129,10 @@ export function useSpecShieldAPI() {
           "x-client-privileges": '{"root":["root"]}',
           "x-user-name": "test",
         },
-        body: JSON.stringify({ baseUrl }),
+        body: JSON.stringify({ baseUrl , "Content-Type": "application/json",
+          "x-tenant-id": selectedTenant,
+          "x-client-privileges": '{"root":["root"]}',
+          "x-user-name": "test", }),
       });
 
       if (!genResp.ok) {
